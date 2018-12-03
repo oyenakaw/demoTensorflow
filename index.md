@@ -1,37 +1,149 @@
-## Welcome to GitHub Pages
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    .buttonArea {
+      display: flex;
+      margin:auto;
+    }
+    .buttonStyle {
+      padding: 20px;
+      margin: 30px;
+    }
+  </style>
+  <title>Tutorial of TensorFlow.js</title>
+</head>
+<body>
+  <div class="buttonArea">
+    <input type="button" value="データ生成" onclick="act()" class="buttonStyle">
+    <input type="button" value="学習" onclick="doTrain()" class="buttonStyle">
+    <input type="button" value="評価更新" onclick="doUpdate()" class="buttonStyle">
+  </div>
+  <div class="buttonArea">
+  </div>
+  <div>
+    <canvas id="canvas"></canvas>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@0.8.0"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.7.2/Chart.js"></script>
+  <script>
 
-You can use the [editor on GitHub](https://github.com/oyenakaw/demoTensorflow/edit/master/index.md) to maintain and preview the content for your website in Markdown files.
+    let tDataX;
+    let tDataY;
 
-Whenever you commit to this repository, GitHub Pages will run [Jekyll](https://jekyllrb.com/) to rebuild the pages in your site, from the content in your Markdown files.
+    const model = tf.sequential();
+    model.add(tf.layers.dense({units: 5, inputShape: [1]}));
+    model.add(tf.layers.dense({units: 5, activation: 'relu'}));
+    model.add(tf.layers.dense({units: 5, activation: 'relu'}));
+    model.add(tf.layers.dense({units: 5, activation: 'relu'}));
+    model.add(tf.layers.dense({units: 5, activation: 'relu'}));
+    model.add(tf.layers.dense({units: 1, activation: 'linear'}));
+    
+    const learningRate = 0.00005;
+    let optimizer = tf.train.sgd(learningRate);
+    model.compile({optimizer: optimizer, loss: 'meanSquaredError'});
 
-### Markdown
+    window.chartColors = {
+      red: "#FF0000",
+      blue: "#0000FF"
+    };
 
-Markdown is a lightweight and easy-to-use syntax for styling your writing. It includes conventions for
+    /**
+    /* プロット対象データクラス
+     */
+    let Model = class {
+      constructor(_x, _y) {
+        this.x = _x;
+        this.y = _y;
+      }
+    };
+    
+    /**
+    /* ランダムデータ生成処理
+     */
+    let genRandom = () => {
+      let randomData = [];
+      for(let i = 0; i < 100; i++){
+        let xData = i * 0.1 - 5;
+        let yData = (0.2 * Math.pow(xData, 3)) - (0.5 * Math.pow(xData, 2)) + (1.0 * xData) + 10 * Math.random();
+        randomData[i] = new Model(xData, yData);
+      }
+      return randomData;
+    };
+    
+    let genEstimatedValue = () => {
+       let estimatedData = [];
+       let xData = [];
+       let yData = [];
+       for (let i = 0; i < 100; i++){
+         let xData = i * 0.1 - 5;
+         let yData = doPredict(tf.tensor([xData], [1,1])).dataSync()[0];
+         estimatedData[i] = new Model(xData, yData);
+       }
+       return estimatedData;
+     };
 
-```markdown
-Syntax highlighted code block
+    let doPredict = (x) => {
+      return tf.tidy(() => {
+        return model.predict(x);
+      });
+    }
 
-# Header 1
-## Header 2
-### Header 3
+    var color = Chart.helpers.color;
+    var scatter_data = {
+      datasets:[{
+        label: "schatter dots",
+        borderColor: window.chartColors.red,
+        backgroundColor: color(window.chartColors.red).alpha(0.2).rgbString(),
+        pointRadius: 10,
 
-- Bulleted
-- List
+        data: genRandom(),
+        type: 'scatter'
+      },{
+        label: "predict line",
+        borderColor: window.chartColors.blue,
+        backgroundColor: color(window.chartColors.blue).alpha(0.2).rgbString(),
+        data: genEstimatedValue(),
+        type: 'scatter'
+      }]
+    };
 
-1. Numbered
-2. List
+    let chart;
+    let act = () => {
+      var ctx = document.getElementById('canvas').getContext('2d');
+      chart = new Chart(ctx, {
+        type: 'scatter',
+        data: scatter_data,
+          option:{
+            title: {
+              display: true,
+              text: "Chart.js Scatter Chart"
+            },
+          }
+      });
+    };
 
-**Bold** and _Italic_ and `Code` text
+    let setData = () => {
+      let x = [];
+      let y = [];
+      for(let i = 0; i < 100; i++) {
+        x[i] = scatter_data.datasets[0].data[i].x;
+        y[i] = scatter_data.datasets[0].data[i].y;
+      }
+      tDataX = tf.tensor1d(x);
+      tDataY = tf.tensor1d(y);
+    };
 
-[Link](url) and ![Image](src)
-```
+    let doTrain = () => {
+      setData();
+      model.fit(tDataX,tDataY,{epochs: 1000});
+    };
 
-For more details see [GitHub Flavored Markdown](https://guides.github.com/features/mastering-markdown/).
-
-### Jekyll Themes
-
-Your Pages site will use the layout and styles from the Jekyll theme you have selected in your [repository settings](https://github.com/oyenakaw/demoTensorflow/settings). The name of this theme is saved in the Jekyll `_config.yml` configuration file.
-
-### Support or Contact
-
-Having trouble with Pages? Check out our [documentation](https://help.github.com/categories/github-pages-basics/) or [contact support](https://github.com/contact) and we’ll help you sort it out.
+    let doUpdate = () => {
+      chart.data.datasets[1].data = genEstimatedValue();
+      chart.update();
+    };
+  </script>
+</body>
